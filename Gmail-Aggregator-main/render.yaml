@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gmail-multi-app
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
+      - key: SECRET_KEY
+        value: your-secret-key-change-this-in-production
+      - key: GOOGLE_CLIENT_ID
+        value: your-google-client-id
+      - key: GOOGLE_CLIENT_SECRET
+        value: your-google-client-secret
+      - key: GOOGLE_REDIRECT_URI
+        value: https://your-app-name.onrender.com/oauth2callback
+    healthCheckPath: /
