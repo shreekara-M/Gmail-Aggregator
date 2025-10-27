@@ -12,8 +12,25 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-TOKENS_DIR = Path("tokens")
-TOKENS_DIR.mkdir(exist_ok=True)
+def is_https_request():
+    """Check if the request is using HTTPS (for production environments)"""
+    return (
+        request.headers.get('X-Forwarded-Proto') == 'https' or
+        request.headers.get('X-Forwarded-Ssl') == 'on' or
+        request.is_secure
+    )
+
+def get_redirect_uri():
+    """Get the proper redirect URI for OAuth"""
+    redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI')
+    if not redirect_uri:
+        if is_https_request():
+            # Production environment - ensure HTTPS
+            redirect_uri = request.url_root.replace('http://', 'https://') + "oauth2callback"
+        else:
+            redirect_uri = request.url_root + "oauth2callback"
+    return redirect_uri
+
 
 def get_oauth_credentials():
     """Get OAuth credentials from environment variables or credentials.json file"""
@@ -108,10 +125,7 @@ def add_user():
         credentials = get_oauth_credentials()
         
         # Use the proper redirect URI from environment or use the configured one
-        redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI')
-        if not redirect_uri:
-            # Fallback to dynamic redirect URI for development
-            redirect_uri = request.url_root + "oauth2callback"
+        redirect_uri = get_redirect_uri()
         
         flow = Flow.from_client_config(credentials, SCOPES)
         flow.redirect_uri = redirect_uri
@@ -137,15 +151,17 @@ def oauth2callback():
         credentials = get_oauth_credentials()
         
         # Use the same redirect URI as in the authorization request
-        redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI')
-        if not redirect_uri:
-            redirect_uri = request.url_root + "oauth2callback"
+        redirect_uri = get_redirect_uri()
         
         flow = Flow.from_client_config(credentials, SCOPES)
         flow.redirect_uri = redirect_uri
         
-        # Get the authorization response
-        authorization_response = request.url
+        # Get the authorization response - ensure HTTPS in production
+        if is_https_request():
+            # Production environment with HTTPS
+            authorization_response = request.url.replace('http://', 'https://')
+        else:
+            authorization_response = request.url
         
         # Verify state parameter for security
         from flask import session
